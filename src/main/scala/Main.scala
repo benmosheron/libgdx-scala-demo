@@ -7,7 +7,7 @@ import com.badlogic.gdx.backends.lwjgl.{LwjglApplication, LwjglApplicationConfig
 def main: Unit =
   new Launcher().runUntilFinished { finish =>
     val config = new LwjglApplicationConfiguration()
-    config.height = 500
-    config.width = 1000
+    config.height = 1080
+    config.width = 1920
     val _ = new LwjglApplication(new DemoGame(finish), config)
   }

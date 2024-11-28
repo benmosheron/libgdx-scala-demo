@@ -1,13 +1,17 @@
 package com.benmosheron
-import com.badlogic.gdx.{Gdx, Screen}
+import com.badlogic.gdx.{Gdx, InputMultiplexer, Screen}
 import com.badlogic.gdx.graphics.{GL20, OrthographicCamera}
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType
 import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.utils.viewport.{FitViewport, Viewport}
+import com.benmosheron.input.ScrollInputProcessor
 
 class DemoScreen(finish: () => Unit) extends Screen {
+
+  private val scrollInputProcessor = new ScrollInputProcessor()
+  Gdx.input.setInputProcessor(new InputMultiplexer(scrollInputProcessor))
 
   private val worldWidth = 2000
   private val worldHeight = 1000
@@ -21,10 +25,6 @@ class DemoScreen(finish: () => Unit) extends Screen {
     Gdx.graphics.getHeight / 2,
     0
   )
-
-  camera.update()
-  viewport.update(Gdx.graphics.getWidth, Gdx.graphics.getHeight, true)
-  shapeRenderer.setProjectionMatrix(camera.combined)
 
   private val nx = 640
   private val ny = 320
@@ -79,6 +79,15 @@ class DemoScreen(finish: () => Unit) extends Screen {
 
   private val xy = Vector2(0, 0)
   def render(delta: Float): Unit = {
+
+    // Zoom the camera
+    val scroll = scrollInputProcessor.readScrollAndReset
+    camera.zoom = if (scroll == 0) { camera.zoom }
+    else if (scroll == 1) { camera.zoom * 1.1f }
+    else { camera.zoom / 1.1f }
+    camera.update()
+    shapeRenderer.setProjectionMatrix(camera.combined)
+
     Gdx.gl.glClearColor(0.01f, 0.1f, 0.3f, 1)
     Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
     Gdx.gl.glLineWidth(2)
@@ -110,6 +119,7 @@ class DemoScreen(finish: () => Unit) extends Screen {
     println("RESIZE")
     println(s"(${Gdx.graphics.getWidth}, ${Gdx.graphics.getHeight})")
 
+    camera.update()
     viewport.update(width, height, true)
     shapeRenderer.setProjectionMatrix(camera.combined)
   }
