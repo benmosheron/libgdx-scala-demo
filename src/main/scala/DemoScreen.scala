@@ -1,10 +1,10 @@
 package com.benmosheron
-import com.badlogic.gdx.{Gdx, InputMultiplexer, Screen}
+import com.badlogic.gdx.{Gdx, Input, InputMultiplexer, Screen}
 import com.badlogic.gdx.graphics.{GL20, OrthographicCamera}
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType
-import com.badlogic.gdx.math.Vector2
+import com.badlogic.gdx.math.{Vector2, Vector3}
 import com.badlogic.gdx.utils.viewport.{FitViewport, Viewport}
 import com.benmosheron.input.ScrollInputProcessor
 
@@ -12,6 +12,9 @@ class DemoScreen(finish: () => Unit) extends Screen {
 
   private val scrollInputProcessor = new ScrollInputProcessor()
   Gdx.input.setInputProcessor(new InputMultiplexer(scrollInputProcessor))
+
+  // This is quite annoying, ESC to show cursor
+  Gdx.input.setCursorCatched(true)
 
   private val worldWidth = 2000
   private val worldHeight = 1000
@@ -80,26 +83,49 @@ class DemoScreen(finish: () => Unit) extends Screen {
   private val xy = Vector2(0, 0)
   def render(delta: Float): Unit = {
 
-    // Zoom the camera
-    val scroll = scrollInputProcessor.readScrollAndReset
-    camera.zoom = if (scroll == 0) { camera.zoom }
-    else if (scroll == 1) { camera.zoom * 1.1f }
-    else { camera.zoom / 1.1f }
-    camera.update()
-    shapeRenderer.setProjectionMatrix(camera.combined)
-
-    Gdx.gl.glClearColor(0.01f, 0.1f, 0.3f, 1)
-    Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
-    Gdx.gl.glLineWidth(2)
-
+    // Read the mouse position
     xy.set(viewport.unproject(new Vector2(Gdx.input.getX.toFloat, Gdx.input.getY.toFloat)))
     xy.set(
       math.max(math.min(xy.x, viewport.getWorldWidth - 1), 0),
       math.max(math.min(xy.y, viewport.getWorldHeight - 1), 0)
     )
 
+    // Read mouse scroll
+    val scroll = scrollInputProcessor.readScrollAndReset
+
+    // Zoom the camera
+    camera.zoom = if (scroll == 0) { camera.zoom }
+    else if (scroll == 1) { camera.zoom * 1.1f }
+    else { camera.zoom / 1.1f }
+
+    // Allow mouse to escape the window on ESC
+    if(Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)){
+      Gdx.input.setCursorCatched(!Gdx.input.isCursorCatched)
+      val moveTo = viewport.project(xy)
+      Gdx.input.setCursorPosition(moveTo.x.toInt, moveTo.y.toInt)
+    }
+
+    // Restrict the mouse to the window
+    if(Gdx.input.getX < 0) Gdx.input.setCursorPosition(0, Gdx.input.getY)
+    if(Gdx.input.getY < 0) Gdx.input.setCursorPosition(Gdx.input.getX, 0)
+    if (Gdx.input.getX > Gdx.graphics.getWidth - 1) Gdx.input.setCursorPosition(Gdx.graphics.getWidth - 1, Gdx.input.getY)
+    if (Gdx.input.getY > Gdx.graphics.getHeight - 1) Gdx.input.setCursorPosition(Gdx.input.getX, Gdx.graphics.getHeight - 1)
+
+    // Detect the mouse at the window edge
+    camera.position.add(MoveWindow.readVector(Gdx.input.getX, Gdx.input.getY, Gdx.graphics.getWidth - 1, Gdx.graphics.getHeight - 1, camera.zoom))
+
+    // Update camera and renderers
+    camera.update()
+    shapeRenderer.setProjectionMatrix(camera.combined)
+
+    // Run logic
     updateSquares(delta, xy)
 
+    // Draw things
+    Gdx.gl.glClearColor(0.01f, 0.1f, 0.3f, 1)
+    Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
+    Gdx.gl.glLineWidth(2)
+    
     shapeRenderer.begin(ShapeType.Filled)
 
     (0 until nx)
@@ -129,4 +155,26 @@ class DemoScreen(finish: () => Unit) extends Screen {
   def pause(): Unit = {}
   def resume(): Unit = {}
   def dispose(): Unit = finish()
+
+
+  object MoveWindow {
+
+    def readVector(mouseX: Int, mouseY: Int, width: Int, height: Int, scale: Float): Vector3 = {
+      val v = if mouseX >= width then {
+        if mouseY >= height then new Vector3(1,-1,0)
+        else if mouseY <= 0 then new Vector3(1,1,0)
+        else new Vector3(1,0,0)
+      } else if mouseX <= 0 then {
+        if mouseY >= height then new Vector3(-1,-1,0)
+        else if mouseY <= 0 then new Vector3(-1,1,0)
+        else new Vector3(-1,0,0)
+      }
+      else if mouseY >= height then new Vector3(0,-1,0)
+      else if mouseY <= 0 then new Vector3(0,1,0)
+      else new Vector3(0,0,0)
+
+      v.scl(10f * scale)
+    }
+
+  }
 }
